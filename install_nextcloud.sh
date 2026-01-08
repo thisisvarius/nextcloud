@@ -4,7 +4,7 @@
 #                                                                              #
 #                  Nextcloud Installation                                      #
 #                                                                              #
-#                      Author: Kristian Gasic, minor adaptions by thisisvarius #
+#                      Author: Kristian Gasic, adaptions by thisisvarius #
 #              Bereitgestellt von ZeroPing.sh                                  #
 #                 Lizenz zur freien Verwendung                                 #
 #                                                                              #
@@ -14,11 +14,10 @@
 get_user_input() {
     read -p "Enter MariaDB Username: " MARIADB_USER
     read -sp "Enter MariaDB Password: " MARIADB_PASSWORD
-
-    echo
-    read -p "Enter Subdomain (e.g., nextcloud.example.com): " SUBDOMAIN
     read -p "Enter Nextcloud Admin Username: " NC_USER
     read -sp "Enter Nextcloud Admin Password: " NC_PASSWORD
+    echo
+    read -p "Enter Subdomain (e.g., nextcloud.example.com): " SUBDOMAIN
     IP_ADDRESS=$(hostname -I | awk '{print $1}')
     echo "Detected IP Address: $IP_ADDRESS"
     DB_NAME="nextcloud"

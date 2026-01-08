@@ -4,7 +4,7 @@
 #                                                                              #
 #                  Nextcloud Installation                                      #
 #                                                                              #
-#                      Author: Kristian Gasic, adaptions by thisisvarius #
+#                      Author: Kristian Gasic, adaptions by thisisvarius       #
 #              Bereitgestellt von ZeroPing.sh                                  #
 #                 Lizenz zur freien Verwendung                                 #
 #                                                                              #
@@ -22,6 +22,7 @@ get_user_input() {
     echo "Detected IP Address: $IP_ADDRESS"
     DB_NAME="nextcloud"
     DATA_DIR="/var/www/nextcloud/data"
+    LOG_FILE="install.log"
 }
 
 # Funktion zur Erstellung des Installationsprotokolls
@@ -79,16 +80,33 @@ max_execution_time=3600
 max_input_time=3600
 EOF'
 
-    echo "Configuring Redis..."
+    echo "Configuring Redis..." | tee -a "$LOG_FILE"
+    sudo usermod -a -G redis www-data
     if [ -f /etc/redis/redis.conf ]; then
-        sudo sed -i "s/^# *port .*/port 6379/" /etc/redis/redis.conf
-        sudo sed -i "s/^# *bind 127.0.0.1 ::1/bind 127.0.0.1 ::1/" /etc/redis/redis.conf
-        sudo sed -i "s/^# *maxmemory <bytes>/maxmemory 256mb/" /etc/redis/redis.conf
-        sudo sed -i "s/^# *maxmemory-policy noeviction/maxmemory-policy allkeys-lru/" /etc/redis/redis.conf
-        sudo systemctl restart redis-server || { echo "Failed to restart Redis server"; exit 1; }
+        sudo sed -i "s/^port 6379/port 0/" /etc/redis/redis.conf || { echo "Failed to configure Redis port" | tee -a "$LOG_FILE"; exit 1; }
+        sudo sed -i "s/^# *unixsocketperm 700/unixsocketperm 770/" /etc/redis/redis.conf || { echo "Failed to set unixsocket permissions" | tee -a "$LOG_FILE"; exit 1; }
+        sudo sed -i "s/^# *unixsocket/unixsocket/" /etc/redis/redis.conf || { echo "Failed to uncomment unixsocket" | tee -a "$LOG_FILE"; exit 1; }
     else
-        echo "Redis configuration file not found. Skipping Redis configuration."
+        echo "Redis configuration file not found at /etc/redis/redis.conf" | tee -a "$LOG_FILE"
+        exit 1
     fi
+
+    REDIS_SETTINGS=("apc.enable_cli=1" "redis.session.locking_enabled=1" "redis.session.lock_retries=-1" "redis.session.lock_wait_time=10000")
+    EXISTING_LINES=$(grep -Fxc "${REDIS_SETTINGS[0]}" "/etc/php/8.3/fpm/php.ini")
+
+    if [ "$EXISTING_LINES" -eq 0 ]; then
+        sudo sed -i "1a ${REDIS_SETTINGS[0]}\n${REDIS_SETTINGS[1]}\n${REDIS_SETTINGS[2]}" "/etc/php/8.3/fpm/php.ini" || {
+            echo "Failed to add redis settings to php-fpm" | tee -a "$LOG_FILE";
+            exit 1;
+        }
+    else
+        echo "Redis settings already exist, skipping modification." | tee -a "$LOG_FILE";
+    fi
+
+    sudo service php8.3-fpm restart || { echo "Failed to restart PHP FPM" | tee -a "$LOG_FILE"; exit 1; }
+    sudo systemctl restart apache2 || { echo "Failed to restart Apache" | tee -a "$LOG_FILE"; exit 1; }
+    sudo systemctl restart redis-server || { echo "Failed to restart Redis" | tee -a "$LOG_FILE"; exit 1; }
+    echo "Redis configured successfully!" | tee -a "$LOG_FILE"
 
     echo "Downloading and setting up Nextcloud..."
     wget https://download.nextcloud.com/server/releases/latest.zip || { echo "Failed to download Nextcloud"; exit 1; }
@@ -192,6 +210,7 @@ EOF"
     }
     
     sudo -u www-data php /var/www/nextcloud/occ maintenance:update:htaccess || { echo "Failed to update htaccess" | tee -a "$LOG_FILE"; exit 1; }
+    sudo -u www-data php /var/www/nextcloud/occ db:add-missing-indices || { echo "Failed to update missing indices" | tee -a "$LOG_FILE"; exit 1; }
 
     echo "Nextcloud installation completed successfully!" | tee -a "$LOG_FILE"
     create_install_log

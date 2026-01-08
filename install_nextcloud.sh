@@ -44,7 +44,7 @@ install_nextcloud() {
     sudo apt install apache2 mariadb-server software-properties-common unzip -y || { echo "Failed to install necessary packages"; exit 1; }
     sudo add-apt-repository ppa:ondrej/php -y || { echo "Failed to add PHP repository"; exit 1; }
     sudo apt update || { echo "Failed to update package list"; exit 1; }
-    sudo apt install php8.3 libapache2-mod-php8.3 php8.3-gd php8.3-mysql php8.3-curl php8.3-mbstring php8.3-intl php8.3-imagick php8.3-xml php8.3-zip php8.3-opcache php8.3-redis redis-server php8.3-smbclient php8.3-gmp -y || { echo "Failed to install PHP packages"; exit 1; }
+    sudo apt install php8.3 libapache2-mod-php8.3 php8.3-gd php8.3-mysql php8.3-curl php8.3-mbstring php8.3-intl php8.3-imagick php8.3-xml php8.3-zip php8.3-opcache php8.3-redis redis-server php8.3-smbclient php8.3-gmp php8.3-apcu -y || { echo "Failed to install PHP packages"; exit 1; }
 
     echo "Starting and securing MariaDB..."
     sudo systemctl start mariadb || { echo "Failed to start MariaDB"; exit 1; }
@@ -137,8 +137,13 @@ EOF"
     echo "Migrate MIME types..."
     sudo -u www-data php occ maintenance:repair --include-expensive
 
-    echo "Set Maintenance Window"
+    echo "Set Maintenance Window..."
     sudo -u www-data php occ config:system:set maintenance_window_start --value="1" --type=integer
+
+    echo "Configure Caching..."
+    sudo -u www-data php occ config:system:set memcache.distributed --value \\OC\\Memcache\\Redis
+    sudo -u www-data php occ config:system:set memcache.locking --value \\OC\\Memcache\\Redis
+    sudo -u www-data php occ config:system:set memcache.local --value \\OC\\Memcache\\APCu
 
     echo "Nextcloud installation complete. Please finish the setup through the web interface."
     create_install_log

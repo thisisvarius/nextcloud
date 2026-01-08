@@ -14,11 +14,15 @@
 get_user_input() {
     read -p "Enter MariaDB Username: " MARIADB_USER
     read -sp "Enter MariaDB Password: " MARIADB_PASSWORD
+
     echo
     read -p "Enter Subdomain (e.g., nextcloud.example.com): " SUBDOMAIN
+    read -p "Enter Nextcloud Admin Username: " NC_USER
+    read -sp "Enter Nextcloud Admin Password: " NC_PASSWORD
     IP_ADDRESS=$(hostname -I | awk '{print $1}')
     echo "Detected IP Address: $IP_ADDRESS"
     DB_NAME="nextcloud"
+    DATA_DIR="/var/www/nextcloud/data"
 }
 
 # Funktion zur Erstellung des Installationsprotokolls
@@ -130,22 +134,67 @@ EOF"
     sudo ufw allow 6379/tcp  # Redis
     sudo ufw --force enable || { echo "Failed to enable UFW"; exit 1; }
 
-    echo "Updating indicies..."
-    cd /var/www/nextcloud
-    sudo -u www-data php occ db:add-missing-indices
+    # Install nextcloud depending on if its been installed already
+    INSTALL_STATUS=$(sudo -u www-data php /var/www/nextcloud/occ status --output=json | grep -o '"installed":true')
 
-    echo "Migrate MIME types..."
-    sudo -u www-data php occ maintenance:repair --include-expensive
+    if [ -n "$INSTALL_STATUS" ]; then
+        echo "Nextcloud previously installed." | tee -a "$LOG_FILE"
+    else
+        echo "Running Nextcloud CLI installer..." | tee -a "$LOG_FILE"
+        sudo -u www-data php /var/www/nextcloud/occ maintenance:install \
+            --database "mysql" \
+            --database-name "${DB_NAME}" \
+            --database-user "${MARIADB_USER}" \
+            --database-pass "${MARIADB_PASSWORD}" \
+            --admin-user "${NC_USER}" \
+            --admin-pass "${NC_PASSWORD}" \
+            --data-dir="${DATA_DIR}" || { 
+                echo "Nextcloud CLI installation failed" | tee -a "$LOG_FILE";
+                exit 1;
+            }
+    fi
 
-    echo "Set Maintenance Window..."
-    sudo -u www-data php occ config:system:set maintenance_window_start --value="1" --type=integer
+    echo "Running Nextcloud CLI repair..." | tee -a "$LOG_FILE"
+    sudo -u www-data php /var/www/nextcloud/occ maintenance:repair --include-expensive || { 
+        echo "Nextcloud CLI repair failed" | tee -a "$LOG_FILE";
+        exit 1;
+    }
 
-    echo "Configure Caching..."
-    sudo -u www-data php occ config:system:set memcache.distributed --value \\OC\\Memcache\\Redis
-    sudo -u www-data php occ config:system:set memcache.locking --value \\OC\\Memcache\\Redis
-    sudo -u www-data php occ config:system:set memcache.local --value \\OC\\Memcache\\APCu
+    # Set trusted domain to resolve the admin error
+    echo "Configuring trusted domains..." | tee -a "$LOG_FILE"
+    sudo -u www-data php /var/www/nextcloud/occ config:system:set overwrite.cli.url --value=https://${SUBDOMAIN}/ \
+    && sudo -u www-data php /var/www/nextcloud/occ config:system:set htaccess.RewriteBase --value=/ \
+    && sudo -u www-data php /var/www/nextcloud/occ config:system:set trusted_domains 0 --value=localhost \
+    && sudo -u www-data php /var/www/nextcloud/occ config:system:set trusted_domains 1 --value=${IP_ADDRESS} \
+    && sudo -u www-data php /var/www/nextcloud/occ config:system:set trusted_domains 2 --value=${SUBDOMAIN} || { 
+        echo "Failed to configure trusted domains" | tee -a "$LOG_FILE";
+        exit 1;
+    }
 
-    echo "Nextcloud installation complete. Please finish the setup through the web interface."
+    echo "Configuring nextcloud config to use apcu and redis..." | tee -a "$LOG_FILE"
+    sudo -u www-data php /var/www/nextcloud/occ config:system:set memcache.local --value='\OC\Memcache\APCu' \
+    && sudo -u www-data php /var/www/nextcloud/occ config:system:set filelocking.enabled --value=true --type=boolean \
+    && sudo -u www-data php /var/www/nextcloud/occ config:system:set memcache.locking --value='\OC\Memcache\Redis' \
+    && sudo -u www-data php /var/www/nextcloud/occ config:system:set redis host --value='/run/redis/redis-server.sock' \
+    && sudo -u www-data php /var/www/nextcloud/occ config:system:set redis port --value=0 --type=integer \
+    && sudo -u www-data php /var/www/nextcloud/occ config:system:set redis dbindex --value=0 --type=integer \
+    && sudo -u www-data php /var/www/nextcloud/occ config:system:set redis password --value='' \
+    && sudo -u www-data php /var/www/nextcloud/occ config:system:set redis timeout --value=1.5 --type=float || {
+        echo "Failed to configure nextcloud config" | tee -a "$LOG_FILE";
+        exit 1;
+    }
+
+    echo "Configuring other nextcloud config settings..." | tee -a "$LOG_FILE"
+    sudo -u www-data php /var/www/nextcloud/occ config:system:set maintenance_window_start --type=integer --value=1 \
+    && sudo -u www-data php /var/www/nextcloud/occ config:system:set default_phone_region --value='DE' \
+    && sudo -u www-data php /var/www/nextcloud/occ config:app:set --value=yes serverinfo phpinfo || {
+        echo "Failed to configure nextcloud config" | tee -a "$LOG_FILE";
+        exit 1;
+    }
+    
+    sudo -u www-data php /var/www/nextcloud/occ maintenance:update:htaccess || { echo "Failed to update htaccess" | tee -a "$LOG_FILE"; exit 1; }
+
+    echo "Nextcloud installation completed successfully!" | tee -a "$LOG_FILE"
     create_install_log
     echo "Installation log created: install.log"
 }

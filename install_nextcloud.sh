@@ -130,6 +130,13 @@ EOF"
     sudo ufw allow 6379/tcp  # Redis
     sudo ufw --force enable || { echo "Failed to enable UFW"; exit 1; }
 
+    echo "Updating indicies..."
+    cd /var/www/nextcloud
+    sudo -u www-data php occ db:add-missing-indices
+
+    echo "Migrate MIME types..."
+    sudo -u www-data php occ maintenance:repair --include-expensive
+
     echo "Nextcloud installation complete. Please finish the setup through the web interface."
     create_install_log
     echo "Installation log created: install.log"

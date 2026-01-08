@@ -137,6 +137,9 @@ EOF"
     echo "Migrate MIME types..."
     sudo -u www-data php occ maintenance:repair --include-expensive
 
+    echo "Set Maintenance Window"
+    sudo -u www-data php occ config:system:set maintenance_window_start --value="1" --type=integer
+
     echo "Nextcloud installation complete. Please finish the setup through the web interface."
     create_install_log
     echo "Installation log created: install.log"

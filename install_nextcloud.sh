@@ -44,7 +44,7 @@ install_nextcloud() {
     sudo apt install apache2 mariadb-server software-properties-common unzip -y || { echo "Failed to install necessary packages"; exit 1; }
     sudo add-apt-repository ppa:ondrej/php -y || { echo "Failed to add PHP repository"; exit 1; }
     sudo apt update || { echo "Failed to update package list"; exit 1; }
-    sudo apt install php8.3 libapache2-mod-php8.3 php8.3-gd php8.3-mysql php8.3-curl php8.3-mbstring php8.3-intl php8.3-imagick php8.3-xml php8.3-zip php8.3-opcache php8.3-redis redis-server php8.3-smbclient -y || { echo "Failed to install PHP packages"; exit 1; }
+    sudo apt install php8.3 libapache2-mod-php8.3 php8.3-gd php8.3-mysql php8.3-curl php8.3-mbstring php8.3-intl php8.3-imagick php8.3-xml php8.3-zip php8.3-opcache php8.3-redis redis-server php8.3-smbclient php8.3-gmp -y || { echo "Failed to install PHP packages"; exit 1; }
 
     echo "Starting and securing MariaDB..."
     sudo systemctl start mariadb || { echo "Failed to start MariaDB"; exit 1; }
@@ -63,7 +63,7 @@ zend_extension=opcache.so
 opcache.enable=1
 opcache.enable_cli=1
 opcache.memory_consumption=128
-opcache.interned_strings_buffer=8
+opcache.interned_strings_buffer=16
 opcache.max_accelerated_files=10000
 opcache.revalidate_freq=1
 opcache.save_comments=1

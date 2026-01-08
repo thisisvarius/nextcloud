@@ -32,6 +32,7 @@ echo "##################################################################"
 
     read -p "Enter MariaDB Username: " MARIADB_USER
     read -sp "Enter MariaDB Password: " MARIADB_PASSWORD
+    echo
     read -p "Enter Nextcloud Admin Username: " NC_USER
     read -sp "Enter Nextcloud Admin Password: " NC_PASSWORD
     echo
@@ -485,8 +486,6 @@ echo "##################################################################"
         echo "Failed to configure cron!" | tee -a "$LOG_FILE"
         exit 1
     fi
-}
-
 
 echo
 echo "##################################################################"

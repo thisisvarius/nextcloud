@@ -4,17 +4,14 @@ This script automates the installation and configuration of Nextcloud on an Ubun
 
 ## Author
 
-- **Kristian Gasic**
+- **Kristian Gasic** - i just changed it to use PHP 8.3 ;)
 - Provided by **ZeroPing.sh**
 - License: Free for use
-- For support, contact: [support@zeroping.sh](mailto:support@zeroping.sh)
-- Video Tutorial: (https://www.youtube.com/watch?v=_KRrfq_h9rk)
-
 
 ## Features
 
 - Automated installation of Nextcloud and necessary dependencies.
-- Configuration of MariaDB, PHP 8.1, Redis, and Opcache.
+- Configuration of MariaDB, PHP 8.3, Redis, and Opcache.
 - Option to install SSL certificates using Certbot.
 - Detection of existing Nextcloud installation and option to add SSL later..
 
@@ -27,7 +24,7 @@ This script automates the installation and configuration of Nextcloud on an Ubun
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/PsychoticNLD/nextcloud.git
+   git clone https://github.com/thisisvarius/nextcloud.git
    ```
 
 2. **Navigate to the script directory:**
